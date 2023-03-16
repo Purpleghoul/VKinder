@@ -3,7 +3,7 @@ from random import randrange
 import datetime
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import URL
 from sqlalchemy_utils import database_exists, create_database
@@ -33,7 +33,7 @@ drop_tables(engine)
 create_tables(engine)
 
 Session = sessionmaker(bind=engine)
-metadata = MetaData(bind=engine)
+
 
 session = Session()
 
@@ -81,28 +81,34 @@ def get_user_data(user_id):
 
 
 def check_missing_info(user_data):
-    for item in ['bdate', 'city']:
-        if not user_data.get(item):
-            user_data[item] = ''
-    if user_data.get('bdate'):
-        if len(user_data['bdate'].split('.')) != 3:
-            user_data[item] = ''
-    return user_data
+    if user_data:
+        for item in ['bdate', 'city']:
+            if not user_data.get(item):
+                user_data[item] = ''
+        if user_data.get('bdate'):
+            if len(user_data['bdate'].split('.')) != 3:
+                user_data[item] = ''
+        return user_data
+    write_msg(user_data['id'], 'Ошибка', None)
+    return False
 
 
 """Checking user birthday date and filling it with user input date."""
 
 
 def check_bdate(user_data, user_id):
-    for item_dict in [user_data]:
-        if len(item_dict['bdate'].split('.')) != 3:
-            write_msg(user_id, f'Введите дату рождения в формате "ХХ.ХХ.ХХХХ:"', None)
-            for event in longpoll.listen():
-                if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-                    user_data['bdate'] = event.text
-                    return user_data
-        else:
-            return user_data
+    if user_data:
+        for item_dict in [user_data]:
+            if len(item_dict['bdate'].split('.')) != 3:
+                write_msg(user_id, f'Введите дату рождения в формате "ХХ.ХХ.ХХХХ:"', None)
+                for event in longpoll.listen():
+                    if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                        user_data['bdate'] = event.text
+                        return user_data
+            else:
+                return user_data
+    write_msg(user_data['id'], 'Ошибка', None)
+    return False
 
 
 """Function to transform city name into city id."""
@@ -126,25 +132,30 @@ def city_id(city_name):
 
 
 def check_city(user_data, user_id):
-    for item_dict in [user_data]:
-        if item_dict['city'] == '':
-            write_msg(user_id, f'Введите город:', None)
-            for event in longpoll.listen():
-                if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-                    user_data['city'] = city_id(event.text)[0]['id']
-                    return user_data
-        else:
-            return user_data
+    if user_data:
+        for item_dict in [user_data]:
+            if item_dict['city'] == '':
+                write_msg(user_id, f'Введите город:', None)
+                for event in longpoll.listen():
+                    if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                        user_data['city'] = city_id(event.text)[0]['id']
+                        return user_data
+            else:
+                return user_data
+    write_msg(user_data['id'], 'Ошибка', None)
+    return False
 
 
 """Counting users age."""
 
 
 def get_age(user_data):
-    for key, value in user_data:
-        user_data['age'] = datetime.datetime.now().year - int(user_data['bdate'][-4:])
-        return user_data
-
+    if user_data:
+        for key, value in user_data:
+            user_data['age'] = datetime.datetime.now().year - int(user_data['bdate'][-4:])
+            return user_data
+    write_msg(user_data['id'], 'Ошибка', None)
+    return False
 
 """Searching for pair, accordind to parameters."""
 
@@ -170,18 +181,21 @@ def user_search(user_data):
 """Filtering open accounts."""
 
 
-def get_users_list(users_data):
+def get_users_list(users_data, user_id):
     not_private_list = []
-    for person_dict in users_data:
-        if person_dict.get('is_closed') == False:
-            not_private_list.append(
-                            {'first_name': person_dict.get('first_name'), 'last_name': person_dict.get('last_name'),
-                             'id': person_dict.get('id'), 'vk_link':   'vk.com/id'+str(person_dict.get('id')),
-                             'is_closed': person_dict.get('is_closed')
-                             })
-        else:
-            continue
-    return not_private_list
+    if users_data:
+        for person_dict in users_data:
+            if person_dict.get('is_closed') == False:
+                not_private_list.append(
+                                {'first_name': person_dict.get('first_name'), 'last_name': person_dict.get('last_name'),
+                                 'id': person_dict.get('id'), 'vk_link':   'vk.com/id'+str(person_dict.get('id')),
+                                 'is_closed': person_dict.get('is_closed')
+                                 })
+            else:
+                continue
+        return not_private_list
+    write_msg(user_id, 'Ошибка', None)
+    return False
 
 
 """Combining user data."""
@@ -189,23 +203,32 @@ def get_users_list(users_data):
 
 def combine_user_data(user_id):
     user_data = [get_age(check_city(check_bdate(check_missing_info(get_user_data(user_id)), user_id), user_id))]
-    return user_data
-
+    if user_data:
+        return user_data
+    write_msg(user_id, 'Ошибка', None)
+    return False
 
 """Combining users search data."""
 
 
 def combine_users_data(user_id):
     users_data = get_users_list(
-        user_search(get_age(check_city(check_bdate(check_missing_info(get_user_data(user_id)), user_id), user_id))))
-    return users_data
+        user_search(get_age(check_city(check_bdate(check_missing_info(get_user_data(user_id)), user_id), user_id))), user_id)
+    if users_data:
+        return users_data
+    write_msg(user_id, 'Ошибка', None)
+    return False
+
 
 
 """Getting random account from dictionary."""
 
 
-def get_random_user(users_data):
-    return random.choice(users_data)
+def get_random_user(users_data, user_id):
+    if users_data:
+        return random.choice(users_data)
+    write_msg(user_id, 'Ошибка', None)
+    return False
 
 
 """Getting photos from vk."""
@@ -256,35 +279,33 @@ def get_photos_list(sort_list):
 
 
 def fill_user_table(user_data):
-    for item in user_data:
-        user_record = session.query(User).filter_by(id=item['id']).scalar()
-        if not user_record:
-            user_record = User(id=item['id'], bdate=item['bdate'], city=item['city'], sex=item['sex'],
-                               first_name=item['first_name'], last_name=item['last_name'],
-                               can_access_closed=item['can_access_closed'], is_closed=item['is_closed'],
-                               age=item['age']
-                               )
-        session.add(user_record)
-    return session.commit()
+    if user_data:
+        for item in user_data:
+            user_record = session.query(User).filter_by(id=item['id']).scalar()
+            if not user_record:
+                user_record = User(id=item['id'])
+            session.add(user_record)
+            session.commit()
+        return True
+    write_msg(user_data['id'], 'Ошибка', None)
+    return False
 
 
 """Filling search table."""
 
 
-def fill_user_search_table(users_data):
+def fill_user_search_table(users_data, user_id):
     try:
         for item in users_data:
             users_record = session.query(User_search_data).filter_by(id=item['id']).scalar()
             if not users_record:
-                users_record = User_search_data(
-                                   id=item['id'], first_name=item['first_name'], last_name=item['last_name'],
-                                   vk_link=item['vk_link'], is_closed=item['is_closed']
-                                                )
+                users_record = User_search_data(id=item['id'])
             session.add(users_record)
             session.commit()
         return True
-    except (IntegrityError, InvalidRequestError, PendingRollbackError):
+    except (IntegrityError, InvalidRequestError, PendingRollbackError, TypeError):
         session.rollback()
+        write_msg(user_id, 'Ошибка', None)
         return False
 
 
@@ -296,7 +317,7 @@ def fill_white_list(random_choice):
         random_user_record = session.query(White_list).filter_by(id=item['id']).scalar()
         if not random_user_record:
             random_user_record = White_list(id=item['id'], first_name=item['first_name'], last_name=item['last_name'],
-                                            vk_link=item['vk_link'], is_closed=item['is_closed']
+                                            vk_link=item['vk_link']
                                             )
         session.add(random_user_record)
     return session.commit()
@@ -309,9 +330,7 @@ def fill_black_list(random_choice):
     for item in random_choice:
         random_user_record = session.query(Black_list).filter_by(id=item['id']).scalar()
         if not random_user_record:
-            random_user_record = Black_list(id=item['id'], first_name=item['first_name'], last_name=item['last_name'],
-                               vk_link=item['vk_link'], is_closed=item['is_closed']
-                                            )
+            random_user_record = Black_list(id=item['id'])
         session.add(random_user_record)
     return session.commit()
 
@@ -319,13 +338,15 @@ def fill_black_list(random_choice):
 """Getting list of favorites."""
 
 
-def check_db_favorites():
+def check_db_favorites(user_id):
     db_favorites = session.query(White_list).order_by(White_list.user_id).all()
     all_users = []
-    for item in db_favorites:
-        all_users.append([item.user_id, 'id:'+item.id, item.first_name+' '+item.last_name, item.vk_link+' '])
-    return all_users
-
+    if db_favorites:
+        for item in db_favorites:
+            all_users.append([item.user_id, 'id:'+str(item.id), item.first_name+' '+item.last_name, item.vk_link+' '])
+        return all_users
+    write_msg(user_id, 'Ошибка', None)
+    return False
 
 """Function for new bot messages"""
 

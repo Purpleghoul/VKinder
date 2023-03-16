@@ -25,34 +25,33 @@ def main():
                               f" либо напишите 'нет' при вопросе о продолжении поиска."
                               , None)
                 elif request in ['начать поиск', 'продолжить поиск', 'да']:
-                    fill_user_search_table(combine_users_data(user_id))
-                    try:
-                        random_choice = []
-                        random_choice.append(get_random_user(combine_users_data(user_id)))
-                        if random_choice[0]['id'] not in list_chosen:
-                            write_msg(user_id, {random_choice[0]['first_name']+' '+random_choice[0]['last_name']},
-                                      {','.join(get_photos_list(sort_by_likes(get_photos(random_choice[0]['id']))))})
-                            write_msg(user_id, f"Ссылка на профиль:{random_choice[0]['vk_link']}", None)
-                            write_msg(user_id, f"Занести пользователя в список избранных? да/нет", None)
-                            message_text = loop_bot()
-                            if message_text == 'да':
-                                write_msg(user_id, f"Кандидат занесен в список избранных", None)
-                                fill_white_list(random_choice)
-                                list_chosen.append(random_choice[0]['id'])
-                            elif message_text == 'нет':
-                                write_msg(user_id, f"Кандидат занесен в черный список", None)
-                                fill_black_list(random_choice)
-                                list_chosen.append(random_choice[0]['id'])
-                            write_msg(user_id,
-                                      f"Продолжить поиск? (да/нет)\n"
-                                      f"Либо введите 'показать избранных' для вывода списка избранных."
-                                      , None)
-                        else:
-                            continue
-                    except TypeError:
+                    random_choice = []
+                    get_random_user_data = get_random_user(combine_users_data(user_id), user_id)
+                    random_choice.append(get_random_user_data)
+                    fill_user_search_table([get_random_user_data], user_id)
+                    if random_choice[0]['id'] not in list_chosen:
+                        write_msg(user_id, {random_choice[0]['first_name']+' '+random_choice[0]['last_name']},
+                                  {','.join(get_photos_list(sort_by_likes(get_photos(random_choice[0]['id']))))})
+                        write_msg(user_id, f"Ссылка на профиль:{random_choice[0]['vk_link']}", None)
+                        write_msg(user_id, f"Занести пользователя в список избранных? да/нет", None)
+                        message_text = loop_bot()
+                        if message_text == 'да':
+                            write_msg(user_id, f"Кандидат занесен в список избранных", None)
+                            fill_white_list(random_choice)
+                            list_chosen.append(random_choice[0]['id'])
+                        elif message_text == 'нет':
+                            write_msg(user_id, f"Кандидат занесен в черный список", None)
+                            fill_black_list(random_choice)
+                            list_chosen.append(random_choice[0]['id'])
+                        write_msg(user_id,
+                                  f"Продолжить поиск? (да/нет)\n"
+                                  f"Либо введите 'показать избранных' для вывода списка избранных."
+                                  , None)
+                    else:
                         continue
+
                 elif request == 'показать избранных':
-                    write_msg(user_id, f"{check_db_favorites()}", None)
+                    write_msg(user_id, f"{check_db_favorites(user_id)}", None)
                     write_msg(user_id, f"Продолжить поиск? да/нет", None)
                 elif request in ['пока', 'нет']:
                     write_msg(user_id, "Спасибо за использование сервиса. Всего доброго!", None)
